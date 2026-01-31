@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+
+# Test outputs
+test_report.md
+report.xml
+test-results/
+
+# Tools
+.claude/

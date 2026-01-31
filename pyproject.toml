@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pytest-bdd-md-report"
+version = "1.0.0"
+description = "Markdown test report formatter for pytest-bdd with pytest-playwright screenshot support"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "mkt-tokoi" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Testing",
+]
+keywords = ["pytest", "pytest-bdd", "markdown", "report", "playwright", "e2e", "testing"]
+dependencies = [
+    "pytest>=7.0.0",
+    "jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+playwright = [
+    "pytest-playwright>=0.4.0",
+]
+bdd = [
+    "pytest-bdd>=6.0.0",
+]
+all = [
+    "pytest-playwright>=0.4.0",
+    "pytest-bdd>=6.0.0",
+]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-bdd>=8.1.0",
+    "pytest-playwright>=0.7.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/mkt-tokoi/pytest-bdd-md-report"
+Repository = "https://github.com/mkt-tokoi/pytest-bdd-md-report"
+Issues = "https://github.com/mkt-tokoi/pytest-bdd-md-report/issues"
+
+[project.entry-points."pytest11"]
+bdd_md_report = "pytest_bdd_md_report.plugin"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+]
+exclude = [
+    "/app",
+    "/tests",
+    "/.git",
+    "/.venv",
+    "/.idea",
+    "/.pytest_cache",
+    "/test-results",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pytest_bdd_md_report"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+
+[dependency-groups]
+dev = [
+    "hatchling>=1.28.0",
+]
