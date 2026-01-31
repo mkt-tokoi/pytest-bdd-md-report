@@ -1,46 +1,58 @@
-# DSL-Driven E2E Testing with pytest-bdd + pytest-playwright
+# DSL-Driven E2E Testing - サンプルプロジェクト
 
-Python + pytest-bdd + pytest-playwright を使用した DSL 駆動の E2E テストのサンプルプロジェクトです。
+このリポジトリには以下が含まれています：
+
+1. **pytest-bdd-md-report** - PyPIパッケージ（`src/` ディレクトリ）
+2. **サンプルE2Eテストプロジェクト** - 使用例（`app/`, `tests/` ディレクトリ）
+
+このファイルは **サンプルプロジェクト** の説明です。パッケージの使い方は [README.md](README.md) または [QUICKSTART.md](QUICKSTART.md) を参照してください。
+
+---
+
+## サンプルプロジェクトについて
+
+Python + pytest-bdd + pytest-playwright + **pytest-bdd-md-report** を使用した DSL 駆動の E2E テストのサンプル実装です。
 
 ## 環境セットアップ
 
-### 1. 仮想環境のアクティベート
+### 1. 依存パッケージのインストール
 
 ```bash
-source .venv/bin/activate
-# Windows: .venv\Scripts\activate
-```
+# uvの場合
+uv add pytest pytest-bdd pytest-playwright pytest-bdd-md-report
 
-### 2. 依存パッケージのインストール（済み）
+# pipの場合
+pip install pytest pytest-bdd pytest-playwright pytest-bdd-md-report
 
-```bash
-uv add pytest pytest-bdd pytest-playwright
+# Playwrightブラウザのインストール
 playwright install chromium
 ```
 
-## プロジェクト構成
+## サンプルプロジェクト構成
 
 ```
 project-root/
-├─ app/
-│  ├─ login.html         # サンプルログインページ
-│  ├─ dashboard.html     # サンプルダッシュボード
-│  └─ server.py          # 開発用 HTTP サーバー
-├─ tests/
+├─ src/                         # PyPIパッケージ（pytest-bdd-md-report）
+│  └─ pytest_bdd_md_report/
+│     ├─ plugin.py
+│     └─ templates/
+│        └─ default_report.md.j2
+├─ app/                         # サンプルWebアプリ
+│  ├─ login.html                # サンプルログインページ
+│  ├─ dashboard.html            # サンプルダッシュボード
+│  └─ server.py                 # 開発用 HTTP サーバー
+├─ tests/                       # サンプルテスト
 │  ├─ features/
-│  │  └─ login.feature   # Gherkin DSL テストシナリオ
+│  │  └─ login.feature          # Gherkin DSL テストシナリオ
 │  ├─ steps/
-│  │  └─ login_steps.py  # ステップ定義（Playwright 実装）
-│  ├─ plugins/
-│  │  ├─ __init__.py
-│  │  ├─ markdown_report.py      # Markdownレポートプラグイン
-│  │  └─ templates/
-│  │     └─ default_report.md.j2 # デフォルトテンプレート
-│  ├─ conftest.py        # pytest 設定
-│  └─ test_login.py      # pytest エントリポイント
+│  │  └─ login_steps.py         # ステップ定義（Playwright 実装）
+│  ├─ conftest.py               # pytest 設定
+│  └─ test_login.py             # pytest エントリポイント
 ├─ pyproject.toml
 └─ README.md
 ```
+
+**注意:** `pytest-bdd-md-report` パッケージは `src/` ディレクトリにあり、PyPIパッケージとして独立しています。サンプルテストでは、インストール済みのパッケージを使用します。
 
 ## テストの実行方法
 
@@ -49,7 +61,10 @@ project-root/
 別のターミナルでサーバーを起動します：
 
 ```bash
-source .venv/bin/activate
+# uvの場合
+uv run python app/server.py
+
+# 直接実行の場合
 python app/server.py
 ```
 
@@ -60,25 +75,29 @@ python app/server.py
 #### 通常実行（ヘッドレスモード）
 
 ```bash
+# uvの場合
+uv run pytest
+
+# 直接実行の場合
 pytest
 ```
 
 #### ブラウザを表示して実行
 
 ```bash
-pytest --headed
+uv run pytest --headed
 ```
 
 #### トレース取得（デバッグ用）
 
 ```bash
-pytest --tracing=on
+uv run pytest --tracing=on
 ```
 
 #### 詳細な出力
 
 ```bash
-pytest -v -s
+uv run pytest -v -s
 ```
 
 ## Markdownレポート機能
@@ -228,9 +247,13 @@ AssertionError: Expected login to succeed
 - **ダッシュボード** (http://localhost:8000/dashboard.html)
   - ログイン成功後に表示されるページ
 
-## Gherkin DSL について
+## テストの構造
 
-`tests/features/login.feature` に以下のような Gherkin 形式でテストシナリオを記述します：
+このサンプルプロジェクトでは、テストを以下の3つのファイルに分けて管理しています：
+
+### 1. Featureファイル（Gherkinシナリオ）
+
+`tests/features/login.feature` - ビジネスレベルのテストシナリオ
 
 ```gherkin
 Feature: ログイン機能
@@ -241,26 +264,91 @@ Feature: ログイン機能
     Then ダッシュボードが表示される
 ```
 
-各ステップの実装は `tests/steps/login_steps.py` に記述されています。
+### 2. テストファイル（エントリポイント）
+
+`tests/test_login.py` - pytestが認識するテストファイル
+
+#### 推奨: `scenarios()` で全シナリオを自動登録
+
+```python
+from pytest_bdd import scenarios
+
+# featureファイル内の全シナリオを自動的にテスト化（最もシンプル）
+scenarios("features/login.feature")
+```
+
+**メリット:**
+- 1行で完結
+- 新しいシナリオを追加してもコード変更不要
+
+#### 代替: `@scenario` で個別指定
+
+```python
+from pytest_bdd import scenario
+
+
+@scenario("features/login.feature", "正常にログインできる")
+def test_正常にログインできる():
+    """ログインシナリオのテスト"""
+    pass
+```
+
+**使うべき場合:**
+- 特定のシナリオだけに pytest フィクスチャを適用したい
+- テスト関数名をカスタマイズしたい
+
+**重要:**
+- ファイル名は `test_*.py` または `*_test.py` にする（pytestの命名規則）
+
+### 3. ステップ定義（実装）
+
+`tests/steps/login_steps.py` - 各ステップの具体的な実装
+
+```python
+from pytest_bdd import given, when, then
+
+
+@given("ログインページを開いている")
+def open_login_page(page):
+    page.goto("http://localhost:8000/login.html")
+
+
+@when("正しいユーザー情報を入力する")
+def enter_credentials(page):
+    page.fill("#username", "testuser")
+    page.fill("#password", "password")
+    page.click("#login-button")
+
+
+@then("ダッシュボードが表示される")
+def verify_dashboard(page):
+    assert page.url == "http://localhost:8000/dashboard.html"
+```
+
+**ポイント:**
+- ステップ定義は複数のシナリオで再利用可能
+- `page` フィクスチャはpytest-playwrightが自動提供
+- ステップは Given/When/Then の順序で定義するのが慣例
 
 ## 重要な設定ポイント
 
-### ステップ定義とプラグインの自動読み込み
+### ステップ定義の自動読み込み
 
-`tests/conftest.py` で `pytest_plugins` を使用して、ステップ定義とプラグインを自動的に読み込むように設定しています：
+`tests/conftest.py` で `pytest_plugins` を使用して、ステップ定義を自動的に読み込むように設定しています：
 
 ```python
-pytest_plugins = [
-    "steps.login_steps",        # ステップ定義
-    "plugins.markdown_report",  # Markdownレポートプラグイン
-]
+import pytest
+
+# ステップ定義のみを読み込み
+# pytest-bdd-md-report プラグインはインストール後に自動で有効化される
+pytest_plugins = ["steps.login_steps"]
 ```
 
 この設定により：
 - `tests/steps/login_steps.py` のステップ定義が全てのテストで利用可能
-- `tests/plugins/markdown_report.py` のMarkdownレポート機能が有効化
+- `pytest-bdd-md-report` プラグインは pip/uv でインストールされていれば自動的に有効化
 
-新しいステップファイルやプラグインを追加する場合は、`pytest_plugins` のリストに追加してください。
+新しいステップファイルを追加する場合は、`pytest_plugins` のリストに追加してください。
 
 ## LLM 連携を前提とした設計
 
@@ -270,6 +358,24 @@ pytest_plugins = [
 - Step 定義は再利用前提
 - DSL は業務用語寄り（CSS セレクタを DSL に漏らさない）
 
-## 参考資料
+## 関連ドキュメント
 
-詳細な導入手順については `DSL-Driven-E2E導入.md` を参照してください。
+- **[README.md](README.md)** - pytest-bdd-md-report パッケージの説明
+- **[QUICKSTART.md](QUICKSTART.md)** - 他プロジェクトへの導入ガイド
+- **[PUBLISHING.md](PUBLISHING.md)** - PyPI公開手順
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - プロジェクト構造説明
+
+## パッケージの開発
+
+pytest-bdd-md-report パッケージ自体を開発する場合：
+
+```bash
+# 編集可能モードでインストール
+uv pip install -e .
+
+# ビルド
+uv build
+
+# テスト（サンプルプロジェクトで動作確認）
+uv run pytest tests/ --markdown-report=test_report.md
+```

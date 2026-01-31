@@ -81,4 +81,5 @@ addopts = "-v"
 [dependency-groups]
 dev = [
     "hatchling>=1.28.0",
+    "twine>=6.2.0",
 ]

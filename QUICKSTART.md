@@ -67,16 +67,78 @@ Feature: ログイン機能
     Then ダッシュボードが表示される
 ```
 
-### `tests/steps/login_steps.py`
+### テストファイルの作成
+
+pytest-bddでは、以下の3つの方法でテストを作成できます。
+
+#### 方法1: 自動検出（最推奨）⭐
+
+**`tests/test_login.py`** - テストエントリポイント
 
 ```python
-import pytest
+from pytest_bdd import scenarios
+
+# featureファイル内の全シナリオを自動的にテスト化
+scenarios("features/login.feature")
+```
+
+**`tests/steps/login_steps.py`** - ステップ定義
+
+```python
+from pytest_bdd import given, when, then
+
+
+@given("ログインページを開いている")
+def open_login_page(page):
+    page.goto("https://example.com/login")
+
+
+@when("正しいユーザー情報を入力する")
+def enter_credentials(page):
+    page.fill("#username", "testuser")
+    page.fill("#password", "password123")
+    page.click("#login-button")
+
+
+@then("ダッシュボードが表示される")
+def verify_dashboard(page):
+    assert page.is_visible("#dashboard")
+```
+
+**メリット:**
+- ✅ 1行で完結、超シンプル
+- ✅ 新しいシナリオを追加してもコード変更不要
+- ✅ featureファイルとの同期が不要
+
+#### 方法2: 個別指定（細かい制御が必要な場合）
+
+**`tests/test_login.py`**
+
+```python
+from pytest_bdd import scenario
+
+
+@scenario("features/login.feature", "正常にログインできる")
+def test_正常にログインできる():
+    """ログインシナリオのテスト"""
+    pass
+```
+
+**使うべき場合:**
+- 特定のシナリオだけに pytest フィクスチャを適用したい
+- テスト関数名をカスタマイズしたい
+- 一部のシナリオだけを実行したい
+
+#### 方法3: 統合型（小規模プロジェクト向け）
+
+**`tests/steps/login_steps.py`** - テストとステップ定義を1ファイルに
+
+```python
 from pytest_bdd import given, when, then, scenario
 
 
 @scenario("../features/login.feature", "正常にログインできる")
 def test_login():
-    """ログインシナリオのテスト"""
     pass
 
 
@@ -96,6 +158,11 @@ def enter_credentials(page):
 def verify_dashboard(page):
     assert page.is_visible("#dashboard")
 ```
+
+**推奨:**
+- **方法1**: ほとんどの場合はこれを使う（最もシンプル）
+- **方法2**: 特定のシナリオに特別な設定が必要な場合のみ
+- **方法3**: 非常に小規模なプロジェクトで、ファイル数を減らしたい場合
 
 ### `tests/conftest.py`
 
