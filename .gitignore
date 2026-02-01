@@ -21,3 +21,4 @@ test-results/
 
 # Tools
 .claude/
+/.env

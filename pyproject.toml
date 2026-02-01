@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pytest-bdd-md-report"
-version = "1.0.1"
+version = "1.0.2"
 description = "Markdown test report formatter for pytest-bdd with pytest-playwright screenshot support"
 readme = "README.md"
 license = "MIT"

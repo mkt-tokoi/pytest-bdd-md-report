@@ -10,37 +10,35 @@
 - **Total Duration**: {{ summary.total_duration }}
 
 ## Test Results
-
 {% for feature_name, scenarios in features.items() %}
-### Feature: {{ feature_name }}
 
+### Feature: {{ feature_name }}
 {% for scenario in scenarios %}
 {% set status_icon = "[PASS]" if scenario.status == "PASSED" else "[FAIL]" if scenario.status == "FAILED" else "[SKIP]" %}
+
 #### {{ status_icon }} Scenario: {{ scenario.scenario_name }}
 - **Status**: {{ scenario.status }}
 - **Duration**: {{ "%.2f"|format(scenario.duration) }}s
-
 {% if scenario.steps %}
+
 **Steps:**
-{% for step in scenario.steps %}
+{% for step in scenario.steps -%}
 {% set step_icon = "[PASS]" if step.status == "passed" else "[FAIL]" %}
 {{ loop.index }}. {{ step_icon }} **{{ step.keyword }}** {{ step.name }} ({{ "%.2f"|format(step.duration) }}s)
-{% endfor %}
-
-{% endif %}
+{% endfor -%}
+{% endif -%}
 {% if scenario.error_message %}
 - **Error**:
 ```
 {{ scenario.error_message }}
 ```
-
-{% endif %}
+{% endif -%}
 {% if scenario.screenshot %}
+
 **Screenshot:**
 ![Test failure screenshot]({{ scenario.screenshot }})
-
 {% endif %}
----
 
-{% endfor %}
+---
+{% endfor -%}
 {% endfor %}

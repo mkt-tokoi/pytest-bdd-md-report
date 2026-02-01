@@ -90,11 +90,8 @@ version = "1.0.1"
 # 古いビルド成果物を削除
 rm -rf dist/
 
-# 再ビルド
-uv build
-
-# PyPIにアップロード
-twine upload dist/*
+# 再ビルド, アップロード
+source .venv/bin/activate; uv build; twine upload dist/*
 ```
 
 ### 公開確認
