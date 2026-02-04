@@ -70,6 +70,35 @@ def pytest_addoption(parser: Parser) -> None:
         default=False,
         help="スクリーンショットをBase64エンコードしてMarkdownに直接埋め込む",
     )
+    group.addoption(
+        "--markdown-report-split",
+        action="store_true",
+        dest="markdown_report_split",
+        default=True,
+        help="レポートをPASS/FAILごとに分割して出力する（デフォルト: 有効）",
+    )
+    group.addoption(
+        "--no-markdown-report-split",
+        action="store_false",
+        dest="markdown_report_split",
+        help="レポートの分割を無効にする",
+    )
+    group.addoption(
+        "--markdown-report-pass-file",
+        action="store",
+        dest="markdown_report_pass_file",
+        metavar="filename",
+        default="report_pass.md",
+        help="PASSしたテストのレポートファイル名（デフォルト: report_pass.md）",
+    )
+    group.addoption(
+        "--markdown-report-fail-file",
+        action="store",
+        dest="markdown_report_fail_file",
+        metavar="filename",
+        default="report_fail.md",
+        help="FAILしたテストのレポートファイル名（デフォルト: report_fail.md）",
+    )
 
 
 def pytest_configure(config: Config) -> None:
@@ -91,6 +120,9 @@ def pytest_configure(config: Config) -> None:
         screenshots=config.option.markdown_report_screenshots,
         screenshots_dir=config.option.markdown_report_screenshots_dir,
         embed_images=config.option.markdown_report_embed_images,
+        split_report=config.option.markdown_report_split,
+        pass_file=config.option.markdown_report_pass_file,
+        fail_file=config.option.markdown_report_fail_file,
     )
     config._markdown_report = plugin  # type: ignore[attr-defined]
     config.pluginmanager.register(plugin)
@@ -115,6 +147,9 @@ class MarkdownReportPlugin:
         screenshots: bool = False,
         screenshots_dir: str = "test_screenshots",
         embed_images: bool = False,
+        split_report: bool = True,
+        pass_file: str = "report_pass.md",
+        fail_file: str = "report_fail.md",
     ) -> None:
         """
         Args:
@@ -124,6 +159,9 @@ class MarkdownReportPlugin:
             screenshots: スクリーンショットを埋め込むかどうか
             screenshots_dir: スクリーンショット保存ディレクトリ
             embed_images: Base64エンコードで埋め込むかどうか
+            split_report: レポートをPASS/FAILごとに分割するかどうか
+            pass_file: PASSしたテストのレポートファイル名
+            fail_file: FAILしたテストのレポートファイル名
         """
         logfile = os.path.expanduser(os.path.expandvars(logfile))
         self.logfile = os.path.normpath(os.path.abspath(logfile))
@@ -132,10 +170,15 @@ class MarkdownReportPlugin:
         self.screenshots = screenshots
         self.screenshots_dir = Path(screenshots_dir)
         self.embed_images = embed_images
+        self.split_report = split_report
+        self.pass_file = pass_file
+        self.fail_file = fail_file
         self.test_results: list[dict] = []
         self.start_time: float = 0.0
         # pytest-playwrightのtest-resultsディレクトリ
         self._test_results_dir = Path("test-results")
+        # 生成されたレポートファイルのリスト（terminal_summary用）
+        self.generated_reports: list[str] = []
 
     def _get_default_template_path(self) -> Path:
         """デフォルトテンプレートのパスを取得"""
@@ -340,31 +383,41 @@ class MarkdownReportPlugin:
         }
         self.test_results.append(result)
 
-    def pytest_sessionfinish(self) -> None:
-        """テストセッション終了時にMarkdownレポートを生成・出力"""
-        total_duration = time.time() - self.start_time
-
-        # スクリーンショットを検索して追加（pytest-playwrightが保存したもの）
-        if self.screenshots:
-            for result in self.test_results:
-                if result["status"] == "FAILED" and result.get("nodeid"):
-                    screenshot_path = self._find_screenshot_for_test(result["nodeid"])
-                    if screenshot_path:
-                        result["screenshot"] = screenshot_path
-
-        # サマリー情報を計算
-        total_tests = len(self.test_results)
-        passed = sum(1 for r in self.test_results if r["status"] == "PASSED")
-        failed = sum(1 for r in self.test_results if r["status"] == "FAILED")
-        skipped = sum(1 for r in self.test_results if r["status"] == "SKIPPED")
-
-        # Featureごとにグループ化
+    def _group_by_feature(self, results: list[dict]) -> dict[str, list[dict]]:
+        """テスト結果をFeatureごとにグループ化"""
         features: dict[str, list[dict]] = {}
-        for result in self.test_results:
+        for result in results:
             feature_name = result["feature_name"]
             if feature_name not in features:
                 features[feature_name] = []
             features[feature_name].append(result)
+        return features
+
+    def _render_report(
+        self,
+        results: list[dict],
+        total_duration: float,
+        report_title: str | None = None,
+    ) -> str:
+        """
+        テスト結果からMarkdownレポートをレンダリング
+
+        Args:
+            results: テスト結果のリスト
+            total_duration: テスト全体の実行時間
+            report_title: レポートタイトル（テンプレートに渡される）
+
+        Returns:
+            レンダリングされたMarkdown文字列
+        """
+        # サマリー情報を計算
+        total_tests = len(results)
+        passed = sum(1 for r in results if r["status"] == "PASSED")
+        failed = sum(1 for r in results if r["status"] == "FAILED")
+        skipped = sum(1 for r in results if r["status"] == "SKIPPED")
+
+        # Featureごとにグループ化
+        features = self._group_by_feature(results)
 
         # テンプレート使用の判定
         use_template = JINJA2_AVAILABLE and (
@@ -388,28 +441,89 @@ class MarkdownReportPlugin:
                     "total_duration": f"{total_duration:.2f}s",
                 },
                 "features": features,
+                "report_title": report_title,
             }
 
             try:
-                markdown_content = self._render_with_template(template_path, context)
+                return self._render_with_template(template_path, context)
             except Exception as e:
                 print(f"Warning: Failed to render template: {e}")
                 print("Falling back to legacy rendering...")
-                markdown_content = self._render_markdown_legacy(total_duration, features)
+                return self._render_markdown_legacy(total_duration, features)
         else:
             # 従来の方式でMarkdownを生成
-            markdown_content = self._render_markdown_legacy(total_duration, features)
+            return self._render_markdown_legacy(total_duration, features)
 
-        # ファイルに出力（親ディレクトリが存在しない場合は自動作成）
+    def _write_report(self, filepath: str, content: str) -> bool:
+        """
+        レポートをファイルに出力
+
+        Args:
+            filepath: 出力先ファイルパス
+            content: レポート内容
+
+        Returns:
+            出力成功時True、失敗時False
+        """
         try:
-            output_dir = os.path.dirname(self.logfile)
+            output_dir = os.path.dirname(filepath)
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
-            with open(self.logfile, "w", encoding="utf-8") as f:
-                f.write(markdown_content)
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            return True
         except Exception as e:
-            print(f"Warning: Failed to write markdown report: {e}")
+            print(f"Warning: Failed to write markdown report to {filepath}: {e}")
+            return False
+
+    def pytest_sessionfinish(self) -> None:
+        """テストセッション終了時にMarkdownレポートを生成・出力"""
+        total_duration = time.time() - self.start_time
+
+        # スクリーンショットを検索して追加（pytest-playwrightが保存したもの）
+        if self.screenshots:
+            for result in self.test_results:
+                if result["status"] == "FAILED" and result.get("nodeid"):
+                    screenshot_path = self._find_screenshot_for_test(result["nodeid"])
+                    if screenshot_path:
+                        result["screenshot"] = screenshot_path
+
+        # メインレポート（全結果）を生成
+        main_content = self._render_report(self.test_results, total_duration)
+        if self._write_report(self.logfile, main_content):
+            self.generated_reports.append(self.logfile)
+
+        # 分割レポートの生成（split_reportがTrueの場合）
+        if self.split_report:
+            report_dir = os.path.dirname(self.logfile)
+
+            # PASSしたテストのレポート
+            passed_results = [r for r in self.test_results if r["status"] == "PASSED"]
+            if passed_results:
+                pass_filepath = os.path.join(report_dir, self.pass_file) if report_dir else self.pass_file
+                pass_filepath = os.path.normpath(os.path.abspath(pass_filepath))
+                pass_content = self._render_report(
+                    passed_results, total_duration, report_title="Test Report (PASSED)"
+                )
+                if self._write_report(pass_filepath, pass_content):
+                    self.generated_reports.append(pass_filepath)
+
+            # FAILしたテストのレポート（SKIPPEDも含む）
+            failed_results = [r for r in self.test_results if r["status"] in ("FAILED", "SKIPPED")]
+            if failed_results:
+                fail_filepath = os.path.join(report_dir, self.fail_file) if report_dir else self.fail_file
+                fail_filepath = os.path.normpath(os.path.abspath(fail_filepath))
+                fail_content = self._render_report(
+                    failed_results, total_duration, report_title="Test Report (FAILED/SKIPPED)"
+                )
+                if self._write_report(fail_filepath, fail_content):
+                    self.generated_reports.append(fail_filepath)
 
     def pytest_terminal_summary(self, terminalreporter: TerminalReporter) -> None:
         """ターミナルにMarkdownレポートファイルのパスを表示"""
-        terminalreporter.write_sep("-", f"generated markdown report: {self.logfile}")
+        if len(self.generated_reports) == 1:
+            terminalreporter.write_sep("-", f"generated markdown report: {self.generated_reports[0]}")
+        elif len(self.generated_reports) > 1:
+            terminalreporter.write_sep("-", "generated markdown reports:")
+            for report_path in self.generated_reports:
+                terminalreporter.write_line(f"  - {report_path}")

@@ -1,4 +1,4 @@
-# Test Report
+# {{ report_title if report_title else "Test Report" }}
 
 **Generated**: {{ generation_time }}
 
@@ -23,7 +23,7 @@
 
 **Steps:**
 {% for step in scenario.steps -%}
-{% set step_icon = "[PASS]" if step.status == "passed" else "[FAIL]" %}
+{%- set step_icon = "[PASS]" if step.status == "passed" else "[FAIL]" %}
 {{ loop.index }}. {{ step_icon }} **{{ step.keyword }}** {{ step.name }} ({{ "%.2f"|format(step.duration) }}s)
 {% endfor -%}
 {% endif -%}

@@ -14,3 +14,8 @@ def input_credentials(page: Page):
 @then("ダッシュボードが表示される")
 def dashboard_is_visible(page: Page):
     expect(page.locator("h1")).to_have_text("Dashboard")
+
+@then("失敗する")
+def always_fail(page: Page):
+    raise AssertionError("This step always fails")
+
